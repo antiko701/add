@@ -20,21 +20,20 @@ class User(UserMixin, db.Model):
     password = db.Column(db.String(100))
     role = db.Column(db.String(50))  # 'admin', 'teacher', or 'student'
 
-# Database creation
-with app.app_context():
-    db.create_all()
-
+# Database creation and admin user creation
 @app.before_first_request
 def create_admin_user():
-    if User.query.filter_by(username='admin').first() is None:
-        admin_user = User(
-            name='Admin',
-            username='admin',
-            password=generate_password_hash('adminpassword'),  # Use a secure password here
-            role='admin'
-        )
-        db.session.add(admin_user)
-        db.session.commit()
+    with app.app_context():  # Ensure we are in the app context
+        db.create_all()  # Create the database tables
+        if User.query.filter_by(username='admin').first() is None:
+            admin_user = User(
+                name='Admin',
+                username='admin',
+                password=generate_password_hash('adminpassword'),  # Use a secure password here
+                role='admin'
+            )
+            db.session.add(admin_user)
+            db.session.commit()
 
 @login_manager.user_loader
 def load_user(user_id):
