@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, request, flash, session
+from flask import Flask, render_template, redirect, url_for, request, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -23,6 +23,18 @@ class User(UserMixin, db.Model):
 # Database creation
 with app.app_context():
     db.create_all()
+
+@app.before_first_request
+def create_admin_user():
+    if User.query.filter_by(username='admin').first() is None:
+        admin_user = User(
+            name='Admin',
+            username='admin',
+            password=generate_password_hash('adminpassword'),  # Use a secure password here
+            role='admin'
+        )
+        db.session.add(admin_user)
+        db.session.commit()
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -51,8 +63,6 @@ def login():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    if current_user.role == 'admin':
-        return render_template('dashboard.html')
     return render_template('dashboard.html')
 
 # Add Student
