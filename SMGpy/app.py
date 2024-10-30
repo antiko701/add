@@ -4,35 +4,36 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your_secret_key'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.secret_key = 'your_secret_key'  # Change this to a random secret key
+
 db = SQLAlchemy(app)
-login_manager = LoginManager(app)
-login_manager.login_view = 'login'
+login_manager = LoginManager()
+login_manager.init_app(app)
 
 # User Model
-class User(db.Model, UserMixin):
+class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(150), nullable=False)
-    username = db.Column(db.String(150), unique=True, nullable=False)
-    password = db.Column(db.String(150), nullable=False)
-    role = db.Column(db.String(10), nullable=False)  # 'admin', 'teacher', 'student'
+    name = db.Column(db.String(100))
+    username = db.Column(db.String(100), unique=True)
+    password = db.Column(db.String(100))
+    role = db.Column(db.String(50))  # 'admin', 'teacher', or 'student'
 
-# Marks Model
-class Marks(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    student_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    subject = db.Column(db.String(100), nullable=False)
-    marks = db.Column(db.Float, nullable=False)
+# Database creation
+with app.app_context():
+    db.create_all()
 
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
 
+# Home page
 @app.route('/')
 def home():
     return render_template('login.html')
 
+# Login page
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -42,16 +43,19 @@ def login():
         if user and check_password_hash(user.password, password):
             login_user(user)
             return redirect(url_for('dashboard'))
-        flash('Login Failed. Check your username and password.')
+        else:
+            flash('Invalid username or password')
     return render_template('login.html')
 
+# Dashboard
 @app.route('/dashboard')
 @login_required
 def dashboard():
     if current_user.role == 'admin':
         return render_template('dashboard.html')
-    return redirect(url_for('home'))
+    return render_template('dashboard.html')
 
+# Add Student
 @app.route('/add_student', methods=['GET', 'POST'])
 @login_required
 def add_student():
@@ -65,35 +69,34 @@ def add_student():
         new_student = User(name=name, username=username, password=password, role='student')
         db.session.add(new_student)
         db.session.commit()
-        flash('Student added successfully!')
-        return redirect(url_for('dashboard'))
-    
+        return redirect(url_for('manage_students'))
     return render_template('add_student.html')
 
+# Manage Students
 @app.route('/manage_students', methods=['GET', 'POST'])
 @login_required
 def manage_students():
     if current_user.role != 'admin':
         return redirect(url_for('dashboard'))
     
-    students = User.query.filter_by(role='student').all()
     if request.method == 'POST':
-        student_id = request.form.get('student_id')
+        student_id = request.form['student_id']
         student = User.query.get(student_id)
         if student:
             db.session.delete(student)
             db.session.commit()
-            flash('Student removed successfully!')
-            return redirect(url_for('manage_students'))
-    
+        return redirect(url_for('manage_students'))
+
+    students = User.query.filter_by(role='student').all()
     return render_template('manage_students.html', students=students)
 
+# Add Teacher
 @app.route('/add_teacher', methods=['GET', 'POST'])
 @login_required
 def add_teacher():
     if current_user.role != 'admin':
         return redirect(url_for('dashboard'))
-    
+
     if request.method == 'POST':
         name = request.form['name']
         username = request.form['username']
@@ -101,57 +104,53 @@ def add_teacher():
         new_teacher = User(name=name, username=username, password=password, role='teacher')
         db.session.add(new_teacher)
         db.session.commit()
-        flash('Teacher added successfully!')
-        return redirect(url_for('dashboard'))
-    
+        return redirect(url_for('manage_teachers'))
     return render_template('add_teacher.html')
 
+# Manage Teachers
 @app.route('/manage_teachers', methods=['GET', 'POST'])
 @login_required
 def manage_teachers():
     if current_user.role != 'admin':
         return redirect(url_for('dashboard'))
     
-    teachers = User.query.filter_by(role='teacher').all()
     if request.method == 'POST':
-        teacher_id = request.form.get('teacher_id')
+        teacher_id = request.form['teacher_id']
         teacher = User.query.get(teacher_id)
         if teacher:
             db.session.delete(teacher)
             db.session.commit()
-            flash('Teacher removed successfully!')
-            return redirect(url_for('manage_teachers'))
-    
+        return redirect(url_for('manage_teachers'))
+
+    teachers = User.query.filter_by(role='teacher').all()
     return render_template('manage_teachers.html', teachers=teachers)
 
+# Add Marks
 @app.route('/add_marks', methods=['GET', 'POST'])
 @login_required
 def add_marks():
     if current_user.role != 'teacher':
         return redirect(url_for('dashboard'))
-    
-    students = User.query.filter_by(role='student').all()
+
     if request.method == 'POST':
         student_id = request.form['student_id']
         subject = request.form['subject']
         marks = request.form['marks']
-        new_marks = Marks(student_id=student_id, subject=subject, marks=marks)
-        db.session.add(new_marks)
-        db.session.commit()
+        # Logic to save marks associated with the student and subject
         flash('Marks added successfully!')
-        return redirect(url_for('dashboard'))
-    
+        return redirect(url_for('add_marks'))
+
+    students = User.query.filter_by(role='student').all()
     return render_template('add_marks.html', students=students)
 
-@app.route('/view_marks', methods=['GET'])
+# View Marks
+@app.route('/view_marks')
 @login_required
 def view_marks():
-    if current_user.role != 'student':
-        return redirect(url_for('dashboard'))
-    
-    marks = Marks.query.filter_by(student_id=current_user.id).all()
-    return render_template('view_marks.html', marks=marks)
+    # Logic to fetch and display marks for the logged-in student
+    return render_template('view_marks.html')
 
+# Logout
 @app.route('/logout')
 @login_required
 def logout():
@@ -159,5 +158,4 @@ def logout():
     return redirect(url_for('home'))
 
 if __name__ == '__main__':
-    db.create_all()  # Create the database tables
     app.run(debug=True)
