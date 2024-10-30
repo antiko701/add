@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <title>Admin Dashboard</title>
+</head>
+<body>
+    <div class="container">
+        <h2 class="mt-5">Admin Dashboard</h2>
+        <a href="{{ url_for('add_student') }}" class="btn btn-primary">Add Student</a>
+        <a href="{{ url_for('manage_students') }}" class="btn btn-primary">Manage Students</a>
+        <a href="{{ url_for('add_teacher') }}" class="btn btn-primary">Add Teacher</a>
+        <a href="{{ url_for('manage_teachers') }}" class="btn btn-primary">Manage Teachers</a>
+        <a href="{{ url_for('logout') }}" class="btn btn-danger">Logout</a>
+    </div>
+</body>
+</html>
